@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  # H2 記憶體資料庫（用於測試）
+  test-db:
+    image: h2database/h2:latest
+    container_name: h2-test-db
+    environment:
+      H2_OPTIONS: -web -webAllowOthers -tcp -tcpAllowOthers -browser
+    ports:
+      - "8082:8082"  # H2 控制台
+      - "9092:9092"  # H2 TCP 端口
+    networks:
+      - test-network
+    command: ["-web", "-webAllowOthers", "-tcp", "-tcpAllowOthers", "-browser"]
+
+  # 測試服務
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: test-runner
+    environment:
+      SPRING_PROFILES_ACTIVE: test
+      SPRING_DATASOURCE_URL: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.h2.Driver
+      SPRING_DATASOURCE_USERNAME: sa
+      SPRING_DATASOURCE_PASSWORD: 
+      SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
+      SPRING_JPA_SHOW_SQL: true
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.H2Dialect
+      SPRING_H2_CONSOLE_ENABLED: true
+    volumes:
+      - ./target:/app/target
+      - ./test-results:/app/test-results
+    networks:
+      - test-network
+    depends_on:
+      - test-db
+    command: ["mvn", "test"]
+
+  # 整合測試服務（使用真實 MySQL）
+  integration-test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: integration-test-runner
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-test:3306/test_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: testuser
+      SPRING_DATASOURCE_PASSWORD: testpassword
+      SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
+      SPRING_JPA_SHOW_SQL: true
+    volumes:
+      - ./target:/app/target
+      - ./test-results:/app/test-results
+    networks:
+      - test-network
+    depends_on:
+      mysql-test:
+        condition: service_healthy
+    command: ["mvn", "test", "-Dtest=*RepositoryTest"]
+
+  # MySQL 測試資料庫
+  mysql-test:
+    image: mysql:8.0
+    container_name: mysql-test-db
+    environment:
+      MYSQL_ROOT_PASSWORD: testrootpassword
+      MYSQL_DATABASE: test_db
+      MYSQL_USER: testuser
+      MYSQL_PASSWORD: testpassword
+    ports:
+      - "3307:3306"  # 使用不同端口避免衝突
+    volumes:
+      - mysql_test_data:/var/lib/mysql
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+    command: --default-authentication-plugin=mysql_native_password
+
+volumes:
+  mysql_test_data:
+    driver: local
+
+networks:
+  test-network:
+    driver: bridge
+
+

@@ -1,0 +1,4 @@
+com/example/springboot_mysql_login_ci_sonar/service/UserServiceTest.class
+com/example/springboot_mysql_login_ci_sonar/controller/AuthControllerTest.class
+com/example/springboot_mysql_login_ci_sonar/SpringbootMysqlLoginCiSonarApplicationTests.class
+com/example/springboot_mysql_login_ci_sonar/repository/UserRepositoryTest.class

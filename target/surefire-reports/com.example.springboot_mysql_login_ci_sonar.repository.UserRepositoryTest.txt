@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.example.springboot_mysql_login_ci_sonar.repository.UserRepositoryTest
+-------------------------------------------------------------------------------
+Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.913 s -- in com.example.springboot_mysql_login_ci_sonar.repository.UserRepositoryTest

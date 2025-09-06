@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuthController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">springboot-mysql-login-ci-sonar</a> &gt; <a href="index.source.html" class="el_package">com.example.springboot_mysql_login_ci_sonar.controller</a> &gt; <span class="el_source">AuthController.java</span></div><h1>AuthController.java</h1><pre class="source lang-java linenums">package com.example.springboot_mysql_login_ci_sonar.controller;
+
+import com.example.springboot_mysql_login_ci_sonar.dto.*;
+import com.example.springboot_mysql_login_ci_sonar.entity.User;
+import com.example.springboot_mysql_login_ci_sonar.service.UserService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+/**
+ * 認證相關 API Controller
+ */
+@RestController
+@RequestMapping(&quot;/api/auth&quot;)
+<span class="fc" id="L18">@RequiredArgsConstructor</span>
+<span class="fc" id="L19">@Slf4j</span>
+@CrossOrigin(origins = &quot;*&quot;)
+public class AuthController {
+
+    private final UserService userService;
+
+    /**
+     * 用戶註冊 API
+     * POST /api/auth/signup
+     */
+    @PostMapping(&quot;/signup&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;UserResponse&gt;&gt; signup(@Valid @RequestBody SignupRequest request) {
+<span class="fc" id="L31">        log.info(&quot;收到註冊請求: username={}, loginId={}&quot;, request.getUsername(), request.getLoginId());</span>
+
+        try {
+<span class="fc" id="L34">            User user = userService.signup(</span>
+<span class="fc" id="L35">                request.getUsername(),</span>
+<span class="fc" id="L36">                request.getLoginId(),</span>
+<span class="fc" id="L37">                request.getPassword()</span>
+            );
+
+<span class="fc" id="L40">            UserResponse userResponse = UserResponse.from(user);</span>
+<span class="fc" id="L41">            ApiResponse&lt;UserResponse&gt; response = ApiResponse.success(&quot;註冊成功&quot;, userResponse);</span>
+
+<span class="fc" id="L43">            log.info(&quot;註冊成功: userId={}&quot;, user.getId());</span>
+<span class="fc" id="L44">            return ResponseEntity.status(HttpStatus.CREATED).body(response);</span>
+
+<span class="fc" id="L46">        } catch (IllegalArgumentException e) {</span>
+<span class="fc" id="L47">            log.warn(&quot;註冊失敗: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L48">            ApiResponse&lt;UserResponse&gt; response = ApiResponse.error(e.getMessage());</span>
+<span class="fc" id="L49">            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);</span>
+
+<span class="nc" id="L51">        } catch (Exception e) {</span>
+<span class="nc" id="L52">            log.error(&quot;註冊過程中發生錯誤&quot;, e);</span>
+<span class="nc" id="L53">            ApiResponse&lt;UserResponse&gt; response = ApiResponse.error(&quot;註冊失敗，請稍後再試&quot;);</span>
+<span class="nc" id="L54">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);</span>
+        }
+    }
+
+    /**
+     * 用戶登入 API
+     * POST /api/auth/login
+     */
+    @PostMapping(&quot;/login&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;UserResponse&gt;&gt; login(@Valid @RequestBody LoginRequest request) {
+<span class="fc" id="L64">        log.info(&quot;收到登入請求: loginId={}&quot;, request.getLoginId());</span>
+
+        try {
+<span class="fc" id="L67">            var userOpt = userService.login(request.getLoginId(), request.getPassword());</span>
+
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            if (userOpt.isPresent()) {</span>
+<span class="fc" id="L70">                User user = userOpt.get();</span>
+<span class="fc" id="L71">                UserResponse userResponse = UserResponse.from(user);</span>
+<span class="fc" id="L72">                ApiResponse&lt;UserResponse&gt; response = ApiResponse.success(&quot;登入成功&quot;, userResponse);</span>
+
+<span class="fc" id="L74">                log.info(&quot;登入成功: userId={}, username={}&quot;, user.getId(), user.getUsername());</span>
+<span class="fc" id="L75">                return ResponseEntity.ok(response);</span>
+            } else {
+<span class="fc" id="L77">                log.warn(&quot;登入失敗: 無效的登入憑證 loginId={}&quot;, request.getLoginId());</span>
+<span class="fc" id="L78">                ApiResponse&lt;UserResponse&gt; response = ApiResponse.error(&quot;登入失敗，請檢查登入 ID 和密碼&quot;);</span>
+<span class="fc" id="L79">                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);</span>
+            }
+
+<span class="nc" id="L82">        } catch (Exception e) {</span>
+<span class="nc" id="L83">            log.error(&quot;登入過程中發生錯誤&quot;, e);</span>
+<span class="nc" id="L84">            ApiResponse&lt;UserResponse&gt; response = ApiResponse.error(&quot;登入失敗，請稍後再試&quot;);</span>
+<span class="nc" id="L85">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);</span>
+        }
+    }
+
+    /**
+     * 健康檢查 API
+     * GET /api/auth/health
+     */
+    @GetMapping(&quot;/health&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;String&gt;&gt; health() {
+<span class="fc" id="L95">        return ResponseEntity.ok(ApiResponse.success(&quot;認證服務正常運行&quot;));</span>
+    }
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

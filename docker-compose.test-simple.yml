@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  # 測試執行器
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: test-runner
+    environment:
+      SPRING_PROFILES_ACTIVE: test
+      SPRING_DATASOURCE_URL: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.h2.Driver
+      SPRING_DATASOURCE_USERNAME: sa
+      SPRING_DATASOURCE_PASSWORD: 
+      SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
+      SPRING_JPA_SHOW_SQL: false
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.H2Dialect
+      SPRING_H2_CONSOLE_ENABLED: false
+    volumes:
+      - ./target:/app/target
+      - ./test-results:/app/test-results
+    networks:
+      - test-network
+    command: ["mvn", "clean", "test", "-Dspring.profiles.active=test"]
+
+networks:
+  test-network:
+    driver: bridge
+
+
