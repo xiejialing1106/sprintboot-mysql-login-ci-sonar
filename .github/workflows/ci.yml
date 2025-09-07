@@ -13,17 +13,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    env:   # 全域變數（適用於 push 和 PR）
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-      SONAR_PROJECT_KEY: com.example:springboot-mysql-login-ci-sonar
-      SONAR_PROJECT_NAME: springboot-mysql-login-ci-sonar
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # SonarQube 分析才會看到完整 git history
+          fetch-depth: 0   # SonarQube 才能看到完整 git history
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -49,26 +43,45 @@ jobs:
       - name: Run Tests with Coverage
         run: mvn clean verify
 
-      # Push 分析
-      - name: SonarQube Analysis (push)
+      # Push 事件的 SonarQube 分析
+      - name: SonarQube Analysis (Push)
         if: github.event_name == 'push'
-        run: mvn sonar:sonar \
-          -Dsonar.projectKey=$SONAR_PROJECT_KEY \
-          -Dsonar.projectName=$SONAR_PROJECT_NAME \
-          -Dsonar.host.url=$SONAR_HOST_URL \
-          -Dsonar.login=$SONAR_TOKEN \
-          -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # GitHub Actions 自動提供
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          mvn sonar:sonar \
+            -Dsonar.projectKey=com.example:springboot-mysql-login-ci-sonar \
+            -Dsonar.projectName="SpringBoot MySQL Login CI SonarQube" \
+            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
 
-      # PR 分析
-      - name: SonarQube Analysis (PR)
+      # Pull Request 事件的 SonarQube 分析
+      - name: SonarQube Analysis (Pull Request)
         if: github.event_name == 'pull_request'
-        run: mvn sonar:sonar \
-          -Dsonar.projectKey=$SONAR_PROJECT_KEY \
-          -Dsonar.projectName=$SONAR_PROJECT_NAME \
-          -Dsonar.host.url=$SONAR_HOST_URL \
-          -Dsonar.login=$SONAR_TOKEN \
-          -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
-          -Dsonar.pullrequest.key=${{ github.event.number }} \
-          -Dsonar.pullrequest.branch=${{ github.head_ref }} \
-          -Dsonar.pullrequest.base=${{ github.base_ref }} \
-          -Dsonar.pullrequest.github.repository=${{ github.repository }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          mvn sonar:sonar \
+            -Dsonar.projectKey=com.example:springboot-mysql-login-ci-sonar \
+            -Dsonar.projectName="SpringBoot MySQL Login CI SonarQube" \
+            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
+            -Dsonar.pullrequest.key=${{ github.event.number }} \
+            -Dsonar.pullrequest.branch=${{ github.head_ref }} \
+            -Dsonar.pullrequest.base=${{ github.base_ref }} \
+            -Dsonar.pullrequest.github.repository=${{ github.repository }}
+
+      # 可選：上傳測試報告作為 artifact
+      - name: Upload Coverage Reports
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-${{ github.run_number }}-${{ github.sha }}
+          path: |
+            target/site/jacoco/jacoco.xml
+            target/surefire-reports/
+          retention-days: 30  # 保存30天後自動刪除
