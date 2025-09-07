@@ -1,24 +1,42 @@
 name: Java CI with Maven + SonarQube
 
 on:
+  push:
+    branches:
+      - '**'      # push 到任何分支都會觸發，若要指定分支可以改成 - main
   pull_request:
     branches:
-      - main
+      - main      # PR → main 才會觸發
     types: [opened, synchronize, reopened]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
+    env:   # 全域變數（適用於 push 和 PR）
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      SONAR_PROJECT_KEY: com.example:springboot-mysql-login-ci-sonar
+      SONAR_PROJECT_NAME: springboot-mysql-login-ci-sonar
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # SonarQube 分析才會看到完整 git history
 
-      - name: Setup JDK
+      - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
+
+      - name: Cache SonarQube packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
 
       - name: Cache Maven packages
         uses: actions/cache@v3
@@ -31,13 +49,23 @@ jobs:
       - name: Run Tests with Coverage
         run: mvn clean verify
 
-      - name: SonarQube Scan
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Push 分析
+      - name: SonarQube Analysis (push)
+        if: github.event_name == 'push'
         run: mvn sonar:sonar \
-          -Dsonar.projectKey=springboot-mysql-login-ci-sonar \
-          -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+          -Dsonar.projectKey=$SONAR_PROJECT_KEY \
+          -Dsonar.projectName=$SONAR_PROJECT_NAME \
+          -Dsonar.host.url=$SONAR_HOST_URL \
+          -Dsonar.login=$SONAR_TOKEN \
+          -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+
+      # PR 分析
+      - name: SonarQube Analysis (PR)
+        if: github.event_name == 'pull_request'
+        run: mvn sonar:sonar \
+          -Dsonar.projectKey=$SONAR_PROJECT_KEY \
+          -Dsonar.projectName=$SONAR_PROJECT_NAME \
+          -Dsonar.host.url=$SONAR_HOST_URL \
           -Dsonar.login=$SONAR_TOKEN \
           -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
           -Dsonar.pullrequest.key=${{ github.event.number }} \
