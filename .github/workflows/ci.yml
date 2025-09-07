@@ -43,6 +43,11 @@ jobs:
       - name: Run Tests with Coverage
         run: mvn clean verify
 
+      - name: Debug SonarQube Connection
+        run: |
+          echo "Testing SonarQube connection..."
+          curl -I --max-time 30 "${{ secrets.SONAR_HOST_URL }}" || echo "Connection failed"
+
       # Push 事件的 SonarQube 分析
       - name: SonarQube Analysis (Push)
         if: github.event_name == 'push'
