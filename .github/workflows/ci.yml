@@ -17,27 +17,27 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # SonarQube 才能看到完整 git history
+          fetch-depth: 0   # SonarQube 才能看到完整 git history, SonarQube 需要比較不同版本的程式碼變化
 
-      - name: Set up JDK
+      - name: Set up JDK   # Java 環境設置
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
+          distribution: temurin # Eclipse Temurin
           java-version: 17
 
       - name: Cache SonarQube packages
         uses: actions/cache@v4
         with:
-          path: ~/.sonar/cache
+          path: ~/.sonar/cache     # SonarQube 快取, 減少重複下載 SonarQube 分析器，提升建置速度
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
 
       - name: Cache Maven packages
         uses: actions/cache@v4
         with:
-          path: ~/.m2
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
+          path: ~/.m2  # Maven 快取, 減少重複下載 Maven 依賴，提升建置速度
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}  # 動態鍵值: hashFiles('**/pom.xml') 確保依賴變更時重建快取
+          restore-keys: | # 還原快取時的鍵值
             ${{ runner.os }}-maven-
 
       - name: Run Tests with Coverage
@@ -62,7 +62,7 @@ jobs:
             -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
             -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
 
-      # Pull Request 事件的 SonarQube 分析
+      # Pull Request 事件的 SonarQube 分析, 只分析變更的程式碼，在 PR 中顯示品質建議，不會分析所有程式碼
       - name: SonarQube Analysis (Pull Request)
         if: github.event_name == 'pull_request'
         env:
