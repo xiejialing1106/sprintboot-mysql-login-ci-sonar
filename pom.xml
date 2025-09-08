@@ -107,17 +107,55 @@
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>0.8.11</version>
                 <executions>
+                    <!-- 收集覆蓋率 -->
                     <execution>
                         <goals>
                             <goal>prepare-agent</goal>
                         </goals>
                     </execution>
+                    <!-- 生成報告 -->
                     <execution>
                         <id>report</id>
                         <phase>verify</phase>
                         <goals>
                             <goal>report</goal>
                         </goals>
+                    </execution>
+                    <!-- 檢查覆蓋率 -->
+                    <execution>
+                        <id>check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <!-- 指定最低 line coverage 要 80% -->
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.80</minimum>
+                                        </limit>
+
+                                        <!-- 方法覆蓋率至少 70% -->
+                                        <!-- <limit>
+                                            <counter>METHOD</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.70</minimum>
+                                        </limit> -->
+                                        <!-- 類別覆蓋率要 100% -->
+                                        <!-- <limit>
+                                            <counter>CLASS</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>1.00</minimum>
+                                        </limit> -->
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
@@ -127,6 +165,30 @@
                 <groupId>org.sonarsource.scanner.maven</groupId>
                 <artifactId>sonar-maven-plugin</artifactId>
                 <version>3.11.0.3922</version>
+                <configuration>
+                    <!-- 基本配置 -->
+                    <sonar.projectKey>com.example:springboot-mysql-login-ci-sonar</sonar.projectKey>
+                    <sonar.projectName>SpringBoot MySQL Login CI SonarQube</sonar.projectName>
+                    
+                    <!-- 程式碼覆蓋率報告路徑 -->
+                    <sonar.coverage.jacoco.xmlReportPaths>target/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+                    
+                    <!-- 排除不需要掃描的檔案 -->
+                    <sonar.exclusions>
+                        **/target/**,
+                        **/Application.java,
+                        **/test/**/*.sql,        <!-- 只排除測試用的 SQL -->
+                        **/migration/**/*.sql    <!-- 只排除資料庫遷移 SQL -->
+                    </sonar.exclusions>
+                    
+                    <!-- 測試檔案路徑 -->
+                    <sonar.tests>src/test/java</sonar.tests>
+                    <sonar.sources>src/main/java</sonar.sources>
+                    
+                    <!-- Java 版本 -->
+                    <sonar.java.source>17</sonar.java.source>
+                    <sonar.java.target>17</sonar.java.target>
+                </configuration>
             </plugin>
         </plugins>
     </build>

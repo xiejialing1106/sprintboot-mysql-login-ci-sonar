@@ -1,9 +1,12 @@
 name: Java CI with Maven + SonarQube
 
 on:
+  push:
+    branches:
+      - '**'      # push 到任何分支都會觸發，若要指定分支可以改成 - main
   pull_request:
     branches:
-      - main
+      - main      # PR → main 才會觸發
     types: [opened, synchronize, reopened]
 
 jobs:
@@ -13,34 +16,77 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # SonarQube 才能看到完整 git history, SonarQube 需要比較不同版本的程式碼變化
 
-      - name: Setup JDK
+      - name: Set up JDK   # Java 環境設置
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
+          distribution: temurin # Eclipse Temurin
           java-version: 17
 
-      - name: Cache Maven packages
-        uses: actions/cache@v3
+      - name: Cache SonarQube packages
+        uses: actions/cache@v4
         with:
-          path: ~/.m2
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
+          path: ~/.sonar/cache     # SonarQube 快取, 減少重複下載 SonarQube 分析器，提升建置速度
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2  # Maven 快取, 減少重複下載 Maven 依賴，提升建置速度
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}  # 動態鍵值: hashFiles('**/pom.xml') 確保依賴變更時重建快取
+          restore-keys: | # 還原快取時的鍵值
             ${{ runner.os }}-maven-
 
       - name: Run Tests with Coverage
         run: mvn clean verify
 
-      - name: SonarQube Scan
+      - name: Debug SonarQube Connection
+        run: |
+          echo "Testing SonarQube connection..."
+          curl -I --max-time 30 "${{ secrets.SONAR_HOST_URL }}" || echo "Connection failed"
+
+      # Push 事件的 SonarQube 分析
+      - name: SonarQube Analysis (Push)
+        if: github.event_name == 'push'
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # GitHub Actions 自動提供
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          mvn sonar:sonar \
+            -Dsonar.projectKey=com.example:springboot-mysql-login-ci-sonar \
+            -Dsonar.projectName="SpringBoot MySQL Login CI SonarQube" \
+            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+
+      # Pull Request 事件的 SonarQube 分析, 只分析變更的程式碼，在 PR 中顯示品質建議，不會分析所有程式碼
+      - name: SonarQube Analysis (Pull Request)
+        if: github.event_name == 'pull_request'
+        env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: mvn sonar:sonar \
-          -Dsonar.projectKey=springboot-mysql-login-ci-sonar \
-          -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
-          -Dsonar.login=$SONAR_TOKEN \
-          -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
-          -Dsonar.pullrequest.key=${{ github.event.number }} \
-          -Dsonar.pullrequest.branch=${{ github.head_ref }} \
-          -Dsonar.pullrequest.base=${{ github.base_ref }} \
-          -Dsonar.pullrequest.github.repository=${{ github.repository }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          mvn sonar:sonar \
+            -Dsonar.projectKey=com.example:springboot-mysql-login-ci-sonar \
+            -Dsonar.projectName="SpringBoot MySQL Login CI SonarQube" \
+            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
+            -Dsonar.pullrequest.key=${{ github.event.number }} \
+            -Dsonar.pullrequest.branch=${{ github.head_ref }} \
+            -Dsonar.pullrequest.base=${{ github.base_ref }} \
+            -Dsonar.pullrequest.github.repository=${{ github.repository }}
+
+      # 可選：上傳測試報告作為 artifact
+      - name: Upload Coverage Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ github.run_number }}-${{ github.sha }}
+          path: |
+            target/site/jacoco/jacoco.xml
+            target/surefire-reports/
+          retention-days: 30  # 保存30天後自動刪除
